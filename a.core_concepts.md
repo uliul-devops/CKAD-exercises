@@ -1,6 +1,16 @@
 ![](https://gaforgithub.azurewebsites.net/api?repo=CKAD-exercises/core_concepts&empty)
 # Core Concepts (13%)
 
+kubernetes.io > Documentation > Reference > kubectl CLI > [kubectl Cheat Sheet](https://kubernetes.io/docs/reference/kubectl/cheatsheet/)
+
+kubernetes.io > Documentation > Tasks > Monitoring, Logging, and Debugging > [Get a Shell to a Running Container](https://kubernetes.io/docs/tasks/debug-application-cluster/get-shell-running-container/)
+
+kubernetes.io > Documentation > Tasks > Access Applications in a Cluster > [Configure Access to Multiple Clusters](https://kubernetes.io/docs/tasks/access-application-cluster/configure-access-multiple-clusters/)
+
+kubernetes.io > Documentation > Tasks > Access Applications in a Cluster > [Accessing Clusters](https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster/) using API
+
+kubernetes.io > Documentation > Tasks > Access Applications in a Cluster > [Use Port Forwarding to Access Applications in a Cluster](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/)
+
 ### Create a namespace called 'mynamespace' and a pod with image nginx called nginx on this namespace
 
 <details><summary>show</summary>
@@ -22,7 +32,7 @@ kubectl run nginx --image=nginx --restart=Never -n mynamespace
 Easily generate YAML with:
 
 ```bash
-kubectl run nginx --image=nginx --restart=Never -n mynamespace --dry-run -o yaml > pod.yaml
+kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml > pod.yaml
 ```
 
 ```bash
@@ -49,7 +59,13 @@ status: {}
 ```
 
 ```bash
-kubectl create -f pod.yaml
+kubectl create -f pod.yaml -n mynamespace
+```
+
+Alternatively, you can run in one line
+
+```bash
+kubectl run nginx --image=nginx --restart=Never --dry-run -o yaml | kubectl create -n mynamespace -f -
 ```
 
 </p>
@@ -78,7 +94,7 @@ kubectl logs busybox
 
 ```bash
 # create a  YAML template with this command
-kubectl run busybox --image=busybox --restart=Never --dry-run -o yaml --command  -- env > envpod.yaml
+kubectl run busybox --image=busybox --restart=Never --dry-run -o yaml --command -- env > envpod.yaml
 # see it
 cat envpod.yaml
 ```
@@ -124,13 +140,13 @@ kubectl create namespace myns -o yaml --dry-run
 </p>
 </details>
 
-### Get the YAML for a new ResourceQuota called 'myrq' without creating it
+### Get the YAML for a new ResourceQuota called 'myrq' with hard limits of 1 CPU, 1G memory and 2 pods without creating it
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl create resourcequota myrq -o yaml --dry-run
+kubectl create quota myrq --hard=cpu=1,memory=1G,pods=2 --dry-run -o yaml
 ```
 
 </p>
@@ -171,11 +187,16 @@ kubectl set image pod/nginx nginx=nginx:1.7.1
 kubectl describe po nginx # you will see an event 'Container will be killed and recreated'
 kubectl get po nginx -w # watch it
 ```
+*Note*: you can check pod's image by running
+
+```bash
+kubectl get po nginx -o jsonpath='{.spec.containers[].image}{"\n"}'
+```
 
 </p>
 </details>
 
-### Get the pod's ip, use a temp busybox image to wget its '/'
+### Get nginx pod's ip created in previous step, use a temp busybox image to wget its '/'
 
 <details><summary>show</summary>
 <p>
@@ -183,22 +204,34 @@ kubectl get po nginx -w # watch it
 ```bash
 kubectl get po -o wide # get the IP, will be something like '10.1.1.131'
 # create a temp busybox pod
-kubectl run busybox --image=busybox --rm -it --restart=Never -- sh
-# run wget on specified IP:Port
-wget -O- 10.1.1.131:80
-exit
+kubectl run busybox --image=busybox --rm -it --restart=Never -- wget -O- 10.1.1.131:80
 ```
+
+Alternatively you can also try a more advanced option:
+
+```bash
+# Get IP of the nginx pod
+NGINX_IP=$(kubectl get pod nginx -o jsonpath='{.status.podIP}')
+# create a temp busybox pod
+kubectl run busybox --image=busybox --env="NGINX_IP=$NGINX_IP" --rm -it --restart=Never -- wget -O- $NGINX_IP:80
+``` 
 
 </p>
 </details>
 
-### Get this pod's YAML without cluster specific information
+### Get pod's YAML
 
 <details><summary>show</summary>
 <p>
 
 ```bash
-kubectl get po nginx -o yaml --export
+kubectl get po nginx -o yaml
+# or
+kubectl get po nginx -oyaml
+# or
+kubectl get po nginx --output yaml
+# or
+kubectl get po nginx --output=yaml
 ```
 
 </p>
@@ -240,7 +273,7 @@ kubectl logs nginx -p
 </p>
 </details>
 
-### Connect to the nginx pod
+### Execute a simple shell on the nginx pod
 
 <details><summary>show</summary>
 <p>
@@ -289,10 +322,8 @@ kubectl run nginx --image=nginx --restart=Never --env=var1=val1
 # then
 kubectl exec -it nginx -- env
 # or
-kubectl describe nginx | grep val1
-
+kubectl describe po nginx | grep val1
 # or
-
 kubectl run nginx --restart=Never --image=nginx --env=var1=val1 -it --rm -- env
 ```
 
